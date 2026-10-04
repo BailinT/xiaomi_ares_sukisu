@@ -1,0 +1,13 @@
+--- a/fs/stat.c
+
++++ b/fs/stat.c
+
+@@ -20,6 +20,7 @@
+
+ 
+ #include <linux/uaccess.h>
+ #include <asm/unistd.h>
++#include <linux/susfs_def.h>
+ 
+ #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+ extern bool susfs_is_inode_sus_kstat(struct inode *inode, bool *out_is_fuse);
