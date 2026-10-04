@@ -90,7 +90,12 @@ jobs:
       - name: Patch Kernel
         working-directory: kernel
         run: |
-          patch -p1 < $GITHUB_WORKSPACE/Patches/susfs-syscall-hooks.patch
+          patch -p1 -F 3 < $GITHUB_WORKSPACE/Patches/resukisu-manual-hooks-4.14.patch
+          for f in "kernel/sys.c:ksu_handle_setresuid" "fs/exec.c:ksu_handle_execveat" "fs/open.c:ksu_handle_faccessat" "fs/read_write.c:ksu_handle_sys_read" "fs/stat.c:ksu_handle_stat" "kernel/reboot.c:ksu_handle_sys_reboot" "drivers/input/input.c:ksu_handle_input_handle_event"; do
+            file="${f%%:*}"; hook="${f##*:}"
+            grep -q "$hook" "$file" || { echo "MISSING HOOK: $hook in $file"; exit 1; }
+          done
+          echo "All 7 manual hooks verified in source"
 
       - name: Apply KernelPatch for SUSFS
         working-directory: kernel
