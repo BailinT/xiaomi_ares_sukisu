@@ -94,7 +94,7 @@ jobs:
         with:
           repository: JackA1ltman/NonGKI_Kernel_Build_2nd
           sparse-checkout: Patches/Patch
-          ref: mainline
+          ref: 319d56adaf5fa3a21b5fdc1cd022f1b907095f64
           path: susfs_upgrade_patch
 
       - name: Patch Kernel
