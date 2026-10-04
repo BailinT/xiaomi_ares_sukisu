@@ -91,6 +91,7 @@ jobs:
         working-directory: kernel
         run: |
           patch -p1 -F 3 < $GITHUB_WORKSPACE/susfs_src/Patches/Patch/susfs_patch_to_4.14.patch
+          patch -p1 -F 3 < $GITHUB_WORKSPACE/Patches/susfs-stat-include-fix.patch
 
       - name: Copy defconfig
         run: |
