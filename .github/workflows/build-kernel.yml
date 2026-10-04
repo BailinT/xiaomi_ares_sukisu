@@ -83,39 +83,19 @@ jobs:
           repository: SukiSU-Ultra/SukiSU_patch
           path: sukisu_patch
 
-      - name: Get susfs4ksu
+      - name: Get susfs consolidated patch (v2.3.0)
         run: |
-          git clone -b kernel-4.14 --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git
-          cp $GITHUB_WORKSPACE/susfs4ksu/kernel_patches/fs/* $GITHUB_WORKSPACE/kernel/fs/
-          cp $GITHUB_WORKSPACE/susfs4ksu/kernel_patches/include/linux/* $GITHUB_WORKSPACE/kernel/include/linux/
-
-      - name: Get susfs Update patch
-        uses: actions/checkout@v5
-        with:
-          repository: JackA1ltman/NonGKI_Kernel_Build_2nd
-          sparse-checkout: Patches/Patch
-          ref: 319d56adaf5fa3a21b5fdc1cd022f1b907095f64
-          path: susfs_upgrade_patch
+          git clone -b mainline --depth=1 https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd.git susfs_src
 
       - name: Patch Kernel
         working-directory: kernel
         run: |
-          patch -p1 -F 3 < $GITHUB_WORKSPACE/Patches/resukisu-manual-hooks-4.14.patch
-          for f in "kernel/sys.c:ksu_handle_setresuid" "fs/exec.c:ksu_handle_execveat" "fs/open.c:ksu_handle_faccessat" "fs/read_write.c:ksu_handle_sys_read" "fs/stat.c:ksu_handle_stat" "kernel/reboot.c:ksu_handle_sys_reboot" "drivers/input/input.c:ksu_handle_input_handle_event"; do
-            file="${f%%:*}"; hook="${f##*:}"
-            grep -q "$hook" "$file" || { echo "MISSING HOOK: $hook in $file"; exit 1; }
-          done
-          echo "All 7 manual hooks verified in source"
+          patch -p1 < $GITHUB_WORKSPACE/Patches/susfs-syscall-hooks.patch
 
       - name: Apply KernelPatch for SUSFS
         working-directory: kernel
         run: |
-          patch -p1 -F 3 < $GITHUB_WORKSPACE/susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.14.patch
-          patch -p1 < $GITHUB_WORKSPACE/susfs_upgrade_patch/Patches/Patch/susfs_upgrade_to_1511_4.14.patch || true
-          patch -p1 < $GITHUB_WORKSPACE/Patches/susfs_upgrade_to_1512_4.14_fix.patch
-          patch -p1 < $GITHUB_WORKSPACE/susfs_upgrade_patch/Patches/Patch/susfs_upgrade_to_1512_4.14.patch || true
-          patch -p1 < $GITHUB_WORKSPACE/susfs_upgrade_patch/Patches/Patch/susfs_upgrade_to_2000_4.14.patch || true
-          patch -p1 < $GITHUB_WORKSPACE/Patches/susfs_upgrade_to_2000_4.14_fix_after.patch
+          patch -p1 -F 3 < $GITHUB_WORKSPACE/susfs_src/Patches/Patch/susfs_patch_to_4.14.patch
 
       - name: Copy defconfig
         run: |
