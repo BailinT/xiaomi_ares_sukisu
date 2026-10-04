@@ -90,7 +90,9 @@ jobs:
       - name: Apply KernelPatch for SUSFS
         working-directory: kernel
         run: |
+          cp fs/proc/task_mmu.c /tmp/task_mmu.c.bak
           patch -p1 -F 3 < $GITHUB_WORKSPACE/susfs_src/Patches/Patch/susfs_patch_to_4.14.patch
+          cp /tmp/task_mmu.c.bak fs/proc/task_mmu.c
           patch -p1 -F 3 < $GITHUB_WORKSPACE/Patches/susfs-stat-include-fix.patch
 
       - name: Copy defconfig
