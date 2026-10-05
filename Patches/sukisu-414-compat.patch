@@ -23,3 +23,17 @@
 +#define MODULE_IMPORT_NS(x)
 +MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 +#endif
+--- a/KernelSU/kernel/feature/sucompat.c
++++ b/KernelSU/kernel/feature/sucompat.c
+@@ -4,7 +4,11 @@
+ #include <linux/preempt.h>
+ #include <linux/printk.h>
+ #include <linux/mm.h>
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+ #include <linux/pgtable.h>
++#else
++#include <asm/pgtable.h>
++#endif
+ #include <linux/uaccess.h>
+ #include <asm/current.h>
+ #include <linux/cred.h>
