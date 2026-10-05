@@ -1,0 +1,25 @@
+--- a/KernelSU/kernel/hook/syscall_hook.h
++++ b/KernelSU/kernel/hook/syscall_hook.h
+@@ -4,6 +4,8 @@
+ 
+ #if defined(__x86_64__)
+ typedef sys_call_ptr_t syscall_fn_t;
++#elif defined(__aarch64__)
++typedef long (*syscall_fn_t)(const struct pt_regs *);
+ #endif
+ 
+ extern syscall_fn_t *ksu_syscall_table;
+--- a/KernelSU/kernel/core/init.c
++++ b/KernelSU/kernel/core/init.c
+@@ -239,6 +239,9 @@
+ MODULE_DESCRIPTION("Android KernelSU");
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
+ MODULE_IMPORT_NS("VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver");
+-#else
++#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+ MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+-#endif
++#else
++#define MODULE_IMPORT_NS(x)
++MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
++#endif
