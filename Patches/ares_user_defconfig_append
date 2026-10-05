@@ -1,6 +1,9 @@
 #KSU
 CONFIG_KSU=y
 
+# KALLSYMS_ALL required by ReSukiSU (static export check bypass)
+CONFIG_KALLSYMS_ALL=y
+
 # Add SUSFS configuration settings
 CONFIG_KSU_SUSFS=y
 CONFIG_KSU_SUSFS_SUS_PATH=y
