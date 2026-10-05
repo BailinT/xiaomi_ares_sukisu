@@ -123,7 +123,11 @@ jobs:
         run: |
           export KBUILD_BUILD_TIMESTAMP=$(date)
           export PATH=/usr/lib/ccache:$GITHUB_WORKSPACE/toolchain/bin:$PATH
-          make -j$(nproc --all) ${args} ares_user_defconfig all
+          make ${args} ares_user_defconfig
+          grep -q "^CONFIG_KSU=y" out/.config || { echo "FATAL: CONFIG_KSU not in .config (Kconfig dependency unmet?)"; grep "CONFIG_KSU" out/.config || true; exit 1; }
+          grep -q "^CONFIG_KPROBES=y" out/.config || { echo "FATAL: CONFIG_KPROBES not in .config"; exit 1; }
+          echo "CONFIG_KSU=y confirmed in .config, building..."
+          make -j$(nproc --all) ${args} all
 
       - name: Pack Kernel using Magiskboot
         working-directory: Magiskboot
