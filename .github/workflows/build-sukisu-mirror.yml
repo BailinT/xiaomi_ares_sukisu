@@ -104,9 +104,10 @@ jobs:
         working-directory: kernel
         run: |
           test -d KernelSU/kernel || { echo "KernelSU/kernel missing"; exit 1; }
-          # 4.14 compat: arm64 syscall_fn_t typedef + MODULE_IMPORT_NS fallback
+          # 4.14 compat: central header + injection
+          cp $GITHUB_WORKSPACE/Patches/ksu_414_compat.h KernelSU/kernel/ksu_414_compat.h
           patch -p1 -F 3 < $GITHUB_WORKSPACE/Patches/sukisu-414-compat.patch
-          grep -q '__aarch64__' KernelSU/kernel/hook/syscall_hook.h && grep -q '#define MODULE_IMPORT_NS' KernelSU/kernel/core/init.c && echo '4.14 compat OK' || { echo 'compat patch did not land'; exit 1; }
+          grep -q 'ksu_414_compat.h' KernelSU/kernel/feature/sucompat.c && echo '4.14 compat OK' || { echo 'compat patch did not land'; exit 1; }
           test -f drivers/kernelsu 2>/dev/null || true
           ls -la drivers/kernelsu || true
           grep -q kernelsu drivers/Makefile && echo "drivers/Makefile has kernelsu entry" || { echo "drivers/Makefile missing kernelsu"; exit 1; }
