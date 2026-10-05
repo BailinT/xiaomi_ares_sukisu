@@ -1,0 +1,132 @@
+name: Build Kernel (SukiSU-Ultra mirror of 40172)
+
+on:
+  workflow_dispatch:
+    inputs:
+      SOURCECODE_BRANCH:
+        description: '源码分支名称或修订版'
+        required: true
+        default: '745733b398f05f2a7fd4483fb0dd556c06b622d9'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
+      CCACHE_NOHASHDIR: "true"
+      CCACHE_HARDLINK: "true"
+      CCACHE_DIR: /home/runner/.ccache
+      CCACHE_MAXSIZE: 8G
+    strategy:
+      fail-fast: false
+    name: Build Kernel for K40GE
+    steps:
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 8192
+          temp-reserve-mb: 2048
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+
+      - name: Install Package
+        run: sudo apt update && sudo apt install -y p7zip-full git ccache
+
+      - name: Builder Signature
+        run: echo "Kernel for Redmi K40 Gaming (ares) - By 抖音王德发刷机"
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.ccache
+          key: ccache-${{ runner.os }}-${{ github.ref }}
+          restore-keys: |
+            ccache-${{ runner.os }}-
+
+      - uses: actions/checkout@v5
+
+      - name: Get Kernel Source Code
+        uses: actions/checkout@v5
+        with:
+          repository: MerCuJerry/android_kernel_aresin
+          ref: ${{ inputs.SOURCECODE_BRANCH }}
+          path: kernel
+
+      - name: Setup Cross-compile toolchain
+        run: |
+          mkdir -p toolchain
+          cd toolchain
+          wget -q https://github.com/Mandi-Sa/clang/releases/download/amd64-kernel-arm_static-22/llvm22.0.0-binutils2.44_amd64-kernel-arm_static-20251116.7z
+          7za x llvm22.0.0-binutils2.44_amd64-kernel-arm_static-20251116.7z
+          rm llvm22.0.0-binutils2.44_amd64-kernel-arm_static-20251116.7z
+
+      - name: Set up SukiSU-Ultra (40172 mirror, susfs-main branch)
+        working-directory: kernel
+        run: |
+          echo DATE=$(date +%F) >> $GITHUB_ENV
+          export BRANCH=susfs-main
+          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s $BRANCH
+          cd ./KernelSU
+          export KSU_VERSION=$(expr $(/usr/bin/git rev-list --count main) "+" 40000 "-" 2815)
+          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
+          sed -i "s/DKSU_VERSION=12800/DKSU_VERSION=${KSU_VERSION}/" kernel/Makefile
+
+      - name: Get susfs consolidated patch (v2.3.0)
+        run: |
+          git clone -b mainline --depth=1 https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd.git susfs_src
+
+      - name: Apply KernelPatch for SUSFS
+        working-directory: kernel
+        run: |
+          cp fs/proc/task_mmu.c /tmp/task_mmu.c.bak
+          patch -p1 -F 3 < $GITHUB_WORKSPACE/susfs_src/Patches/Patch/susfs_patch_to_4.14.patch
+          cp /tmp/task_mmu.c.bak fs/proc/task_mmu.c
+          patch -p1 -F 3 < $GITHUB_WORKSPACE/Patches/susfs-stat-include-fix.patch
+
+      - name: Get SukiSU 4.14 hooks patch
+        run: |
+          git clone --depth=1 https://github.com/SukiSU-Ultra/SukiSU_patch.git sukisu_patch
+
+      - name: Apply SukiSU hooks for 4.14
+        working-directory: kernel
+        run: |
+          patch -p1 -F 3 < $GITHUB_WORKSPACE/sukisu_patch/4.14/ksu_hooks_4.14.patch || true
+          for f in "fs/exec.c:ksu_handle_execveat" "fs/open.c:ksu_handle_faccessat" "fs/read_write.c:ksu_handle_vfs_read" "fs/stat.c:ksu_handle_stat" "drivers/input/input.c:ksu_handle_input_handle_event" "fs/devpts/inode.c:ksu_handle_devpts"; do
+            file="${f%%:*}"; hook="${f##*:}"
+            grep -q "$hook" "$file" || { echo "MISSING HOOK: $hook in $file"; exit 1; }
+          done
+          echo "SukiSU 4.14 hooks verified"
+
+      - name: Copy defconfig
+        run: |
+          cat $GITHUB_WORKSPACE/Patches/ares_user_defconfig_append >> $GITHUB_WORKSPACE/kernel/arch/arm64/configs/ares_user_defconfig
+
+      - name: Build Kernel for K40GE
+        working-directory: kernel
+        env:
+          args: |+
+            LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
+            CC=clang LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS_PERF+=-O3
+        run: |
+          export KBUILD_BUILD_TIMESTAMP=$(date)
+          export PATH=/usr/lib/ccache:$GITHUB_WORKSPACE/toolchain/bin:$PATH
+          make -j$(nproc --all) ${args} ares_user_defconfig all
+
+      - name: Pack Kernel using Magiskboot
+        working-directory: Magiskboot
+        run: |
+            tar -xvf boot.tar.gz
+            chmod +x magiskboot
+            ./magiskboot unpack boot.img
+            cp $GITHUB_WORKSPACE/kernel/out/arch/arm64/boot/Image ./kernel
+            ./magiskboot repack boot.img boot_SukiSU_${{ env.KSUVER }}.img
+
+      - name: Upload repacked boot image
+        uses: actions/upload-artifact@v4
+        with:
+          name: K40GE_SukiSUU_${{ env.KSUVER }}
+          path: Magiskboot/boot_SukiSU_${{ env.KSUVER }}.img
+          compression-level: 9
