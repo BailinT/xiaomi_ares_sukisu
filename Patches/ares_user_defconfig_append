@@ -1,7 +1,12 @@
 #KSU
 CONFIG_KSU=y
 
-# KALLSYMS_ALL required by ReSukiSU (static export check bypass)
+# KSU Kconfig depends on KPROBES && EXT4_FS; tree default has KPROBES off
+CONFIG_KPROBES=y
+CONFIG_HAVE_KPROBES=y
+CONFIG_KPROBE_EVENTS=y
+CONFIG_KPROBES_ON_FTRACE=y
+CONFIG_UPROBES=y
 CONFIG_KALLSYMS_ALL=y
 
 # Add SUSFS configuration settings
