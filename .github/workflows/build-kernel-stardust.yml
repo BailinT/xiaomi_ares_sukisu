@@ -28,7 +28,7 @@ jobs:
           remove-codeql: 'true'
 
       - name: Install Package
-        run: sudo apt update && sudo apt install -y p7zip-full git ccache python-is-python3 bc bison flex
+        run: sudo apt update && sudo apt install -y p7zip-full git ccache python-is-python3 bc bison flex gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi binutils-aarch64-linux-gnu binutils-arm-linux-gnueabi
 
       - name: Restore ccache
         if: ${{ inputs.use_mycache }}
