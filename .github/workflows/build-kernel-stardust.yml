@@ -1,0 +1,117 @@
+name: Build Kernel -- ReSukiSU (Stardust pinned tree)
+
+on:
+  workflow_dispatch:
+    inputs:
+      use_mycache:
+        description: '启用 ccache 加速（首次构建无缓存属正常）'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build K40GE (ares) ReSukiSU+SUSFS via cooollawf Stardust tree
+    steps:
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 8192
+          temp-reserve-mb: 2048
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+
+      - name: Install Package
+        run: sudo apt update && sudo apt install -y p7zip-full git ccache python-is-python3 bc bison flex
+
+      - name: Restore ccache
+        if: ${{ inputs.use_mycache }}
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.ccache
+          key: ccache-stardust-${{ github.run_id }}
+          restore-keys: |
+            ccache-stardust-
+
+      - name: Checkout toolchain repo (this repo: Magiskboot + Patches)
+        uses: actions/checkout@v5
+
+      - name: Clone pinned Stardust tree (cooollawf, ReSukiSU+SUSFS v2.3.0 in-tree)
+        run: |
+          set -e
+          git clone --depth=1 https://github.com/cooollawf/Redmi-ares-K40G-4.14.186-Stardust-Kernel-ReSukiSU.git stardust
+          cd stardust
+          echo "STARDUST_HEAD=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+          echo "== 版本核对 =="
+          grep -E "SUSFS_VERSION|VERSION = |PATCHLEVEL = " Makefile | head -4
+          grep -E "SUSFS_VERSION" include/linux/susfs.h | head -2 || true
+          ls drivers/kernelsu/ | head -5 || true
+          echo "== 确认 in-tree ReSukiSU 真身 =="
+          readlink drivers/kernelsu || true
+          ls KernelSU/kernel/ | head -8
+
+      - name: Setup clang-18 neutron toolchain
+        run: |
+          set -e
+          mkdir -p toolchain
+          cd toolchain
+          # 参考仓同款 clang-18 neutron
+          wget -q https://github.com/Neutron-Toolchains/antman/raw/main/antman
+          chmod +x antman
+          ./antman -S=10032024
+          ./antman --patch=glibc
+
+      - name: Build Image.gz-dtb (Stardust build.sh unmodified)
+        working-directory: stardust
+        run: |
+          set -e
+          chmod +x build.sh build-inc.sh
+          export TOOLCHAIN_DIR=$GITHUB_WORKSPACE/toolchain
+          # 参考仓自带的 build.sh：清 out → defconfig → clang-18 全量编译 Image.gz-dtb
+          ./build.sh 2>&1 | tee build_log.txt
+
+      - name: Verify build output
+        working-directory: stardust
+        run: |
+          set -e
+          test -f out/arch/arm64/boot/Image.gz-dtb || { echo "::error::Image.gz-dtb 未生成"; exit 1; }
+          ls -lh out/arch/arm64/boot/Image.gz-dtb
+          # 提取实际编译版本号
+          OUTVER=$(strings out/arch/arm64/boot/Image.gz-dtb | grep -m1 "Linux version" || true)
+          echo "IMAGE_VER=$OUTVER" >> $GITHUB_ENV
+          echo "$OUTVER"
+
+      - name: Pack boot.img via Magiskboot (K40GE TKJCNXM boot 基底)
+        working-directory: Magiskboot
+        run: |
+          set -e
+          tar -xzf boot.tar.gz
+          chmod +x magiskboot
+          ./magiskboot unpack boot.img
+          # Stardust 编译目标就是 Image.gz-dtb（含 dtb，直接替换 kernel）
+          cp ../stardust/out/arch/arm64/boot/Image.gz-dtb ./kernel
+          ./magiskboot repack boot.img boot_Stardust_ReSukiSU_${{ env.STARDUST_HEAD }}.img
+          ./magiskboot cpio ramdisk.cpio "extract init.rc init.rc.stardust" || true
+          echo "== repack 校验 =="
+          ls -lh boot_Stardust_ReSukiSU_*.img
+
+      - name: Upload boot image
+        uses: actions/upload-artifact@v4
+        with:
+          name: K40GE_Stardust_ReSukiSU_${{ env.STARDUST_HEAD }}
+          path: Magiskboot/boot_Stardust_ReSukiSU_*.img
+          compression-level: 9
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: K40GE_Stardust_buildlog_${{ env.STARDUST_HEAD }}
+          path: stardust/build_log.txt
+          compression-level: 9
