@@ -39,7 +39,7 @@ jobs:
           restore-keys: |
             ccache-stardust-
 
-      - name: Checkout toolchain repo (this repo: Magiskboot + Patches)
+      - name: Checkout toolchain repo (Magiskboot + Patches)
         uses: actions/checkout@v5
 
       - name: Clone pinned Stardust tree (cooollawf, ReSukiSU+SUSFS v2.3.0 in-tree)
